@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color a MIDI</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/webmidi"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        video { width: 80%; border: 2px solid black; }
+        canvas { display: none; }
+        button { margin: 10px; padding: 10px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Color a MIDI</h1>
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <div>
+        <button onclick="calibrate('note')">Calibrar Color Nota</button>
+        <button onclick="calibrate('volume')">Calibrar Color Volumen</button>
+        <button onclick="startTracking()">Iniciar</button>
+        <button onclick="stopTracking()">Detener</button>
+    </div>
+    <div>
+        <label for="scale">Escala:</label>
+        <select id="scale">
+            <option value="major">Mayor</option>
+            <option value="minor">Menor</option>
+        </select>
+    </div>
+    <script>
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let calibratedColors = { note: null, volume: null };
+        let tracking = false;
+        let midiOutput;
+        let notes = [60, 62, 64, 65, 67, 69, 71, 72]; // Notas en escala mayor por defecto
+        
+        function getCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => video.srcObject = stream)
+                .catch(err => console.error('Error con la cámara', err));
+        }
+        
+        function calibrate(type) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            let imageData = ctx.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
+            calibratedColors[type] = { r: imageData[0], g: imageData[1], b: imageData[2] };
+            alert(`${type === 'note' ? 'Color Nota' : 'Color Volumen'} calibrado!`);
+        }
+        
+        function startTracking() {
+            if (!calibratedColors.note || !calibratedColors.volume) {
+                alert('Calibra ambos colores antes de iniciar.');
+                return;
+            }
+            tracking = true;
+            trackColors();
+        }
+        
+        function stopTracking() {
+            tracking = false;
+        }
+        
+        function trackColors() {
+            if (!tracking) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            let imageData = ctx.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data;
+            let detectedColor = { r: imageData[0], g: imageData[1], b: imageData[2] };
+            
+            let closestType = getClosestColorType(detectedColor);
+            if (closestType === 'note') {
+                let noteIndex = Math.floor((video.videoHeight - canvas.height / 2) / (video.videoHeight / notes.length));
+                let note = notes[Math.min(noteIndex, notes.length - 1)];
+                sendMIDI(note, 100);
+            } else if (closestType === 'volume') {
+                let volume = Math.floor((canvas.height / 2) / video.videoHeight * 127);
+                sendMIDI(60, volume); // Volumen para la nota base
+            }
+            requestAnimationFrame(trackColors);
+        }
+        
+        function getClosestColorType(color) {
+            let distances = Object.keys(calibratedColors).map(type => {
+                let c = calibratedColors[type];
+                return { type, distance: Math.sqrt((c.r - color.r) ** 2 + (c.g - color.g) ** 2 + (c.b - color.b) ** 2) };
+            });
+            distances.sort((a, b) => a.distance - b.distance);
+            return distances[0].distance < 50 ? distances[0].type : null;
+        }
+        
+        function sendMIDI(note, velocity) {
+            if (midiOutput) {
+                midiOutput.send([0x90, note, velocity]);
+            }
+        }
+        
+        WebMidi.enable(err => {
+            if (err) console.error('Error con MIDI', err);
+            else {
+                let outputs = WebMidi.outputs;
+                if (outputs.length > 0) midiOutput = outputs[0];
+            }
+        });
+        
+        getCamera();
+    </script>
+</body>
+</html>
