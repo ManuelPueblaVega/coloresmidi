@@ -17,8 +17,8 @@
     <video id="video" autoplay></video>
     <canvas id="canvas"></canvas>
     <div>
-        <button onclick="calibrate('note')">Calibrar Color Nota</button>
-        <button onclick="calibrate('volume')">Calibrar Color Volumen</button>
+        <button onclick="startCalibration('note')">Calibrar Color Nota</button>
+        <button onclick="startCalibration('volume')">Calibrar Color Volumen</button>
         <button onclick="startTracking()">Iniciar</button>
         <button onclick="stopTracking()">Detener</button>
     </div>
@@ -42,6 +42,11 @@
             navigator.mediaDevices.getUserMedia({ video: true })
                 .then(stream => video.srcObject = stream)
                 .catch(err => console.error('Error con la cámara', err));
+        }
+        
+        function startCalibration(type) {
+            getCamera();
+            setTimeout(() => calibrate(type), 2000); // Espera 2 segundos para que el usuario muestre el color
         }
         
         function calibrate(type) {
