@@ -14,7 +14,7 @@
 </head>
 <body>
     <h1>Color a MIDI</h1>
-    <video id="video" autoplay></video>
+    <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
     <div>
         <button onclick="startCalibration('note')">Calibrar Color Nota</button>
@@ -36,20 +36,28 @@
         let calibratedColors = { note: null, volume: null };
         let tracking = false;
         let midiOutput;
-        let notes = [60, 62, 64, 65, 67, 69, 71, 72]; // Notas en escala mayor por defecto
+        let notes = [60, 62, 64, 65, 67, 69, 71, 72];
         
-        function getCamera() {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => video.srcObject = stream)
-                .catch(err => console.error('Error con la cámara', err));
+        async function getCamera() {
+            try {
+                let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error('Error con la cámara', err);
+                alert('No se pudo acceder a la cámara. Verifica los permisos.');
+            }
         }
         
-        function startCalibration(type) {
-            getCamera();
-            setTimeout(() => calibrate(type), 2000); // Espera 2 segundos para que el usuario muestre el color
+        async function startCalibration(type) {
+            await getCamera();
+            setTimeout(() => calibrate(type), 2000);
         }
         
         function calibrate(type) {
+            if (!video.videoWidth || !video.videoHeight) {
+                alert('La cámara no está lista. Intenta nuevamente.');
+                return;
+            }
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -86,7 +94,7 @@
                 sendMIDI(note, 100);
             } else if (closestType === 'volume') {
                 let volume = Math.floor((canvas.height / 2) / video.videoHeight * 127);
-                sendMIDI(60, volume); // Volumen para la nota base
+                sendMIDI(60, volume);
             }
             requestAnimationFrame(trackColors);
         }
@@ -113,8 +121,7 @@
                 if (outputs.length > 0) midiOutput = outputs[0];
             }
         });
-        
-        getCamera();
     </script>
 </body>
 </html>
+
